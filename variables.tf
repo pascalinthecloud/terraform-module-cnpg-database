@@ -9,7 +9,8 @@ variable "databases" {
     create_connection_secret    = optional(bool, true)
     connection_secret_namespace = optional(string, "")
   }))
-  default = []
+  default   = []
+  sensitive = true
 }
 
 variable "cluster" {
