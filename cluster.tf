@@ -67,9 +67,10 @@ resource "kubernetes_manifest" "cluster" {
       }
 
       # Monitoring
+      # When custom pod_monitor_labels are set, disable the auto-generated PodMonitor
+      # and create a custom one (see below) with the desired labels instead.
       monitoring = {
-        enablePodMonitor = var.cluster.enable_pod_monitor
-        podMonitorLabels = length(var.cluster.pod_monitor_labels) > 0 ? var.cluster.pod_monitor_labels : null
+        enablePodMonitor = length(var.cluster.pod_monitor_labels) > 0 ? false : var.cluster.enable_pod_monitor
       }
 
       # Managed roles - define users based on distinct database owners
@@ -130,6 +131,36 @@ resource "kubernetes_manifest" "cluster" {
         # Backup target
         target = var.backup.target
       } : null
+    }
+  }
+}
+
+# Custom PodMonitor with additional labels (e.g. for Prometheus Operator discovery)
+# Created when pod_monitor_labels is set, replacing the CNPG auto-generated PodMonitor.
+resource "kubernetes_manifest" "pod_monitor" {
+  count = length(var.cluster.pod_monitor_labels) > 0 ? 1 : 0
+
+  depends_on = [kubernetes_manifest.cluster]
+
+  manifest = {
+    apiVersion = "monitoring.coreos.com/v1"
+    kind       = "PodMonitor"
+    metadata = {
+      name      = var.cluster.name
+      namespace = var.cluster.namespace
+      labels    = merge(var.labels, var.cluster.pod_monitor_labels)
+    }
+    spec = {
+      selector = {
+        matchLabels = {
+          "cnpg.io/cluster" = var.cluster.name
+        }
+      }
+      podMetricsEndpoints = [
+        {
+          port = "metrics"
+        }
+      ]
     }
   }
 }
