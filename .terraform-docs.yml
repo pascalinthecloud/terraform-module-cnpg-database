@@ -26,3 +26,23 @@ sections:
     - resources
     - inputs
     - outputs
+
+content: |-
+  {{ .Requirements }}
+  {{ .Providers }}
+  {{ .Modules }}
+  {{ .Resources }}
+  {{ .Inputs }}
+  {{ .Outputs }}
+
+  ## Examples
+
+  ### Basic
+  ```hcl
+  {{ include "examples/basic/main.tf" }}
+  ```
+
+  ### PostGIS
+  ```hcl
+  {{ include "examples/postgis/main.tf" }}
+  ```

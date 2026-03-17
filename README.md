@@ -148,17 +148,14 @@ module "my_app_database" {
 |------|---------|
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.0 |
-
 ## Providers
 
 | Name | Version |
 |------|---------|
 | <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | >= 2.0 |
-
 ## Modules
 
 No modules.
-
 ## Resources
 
 | Name | Type |
@@ -172,16 +169,14 @@ No modules.
 | [kubernetes_secret_v1.backup_credentials](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
 | [kubernetes_secret_v1.connection](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
 | [kubernetes_secret_v1.database_password](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
-
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_backup"></a> [backup](#input\_backup) | Backup configuration for S3-based backups using Barman | <pre>object({<br/>    enabled                 = optional(bool, false)<br/>    s3_endpoint_url         = optional(string, "")<br/>    s3_bucket_name          = optional(string, "")<br/>    s3_access_key_id        = optional(string, "")<br/>    s3_secret_access_key    = optional(string, "")<br/>    retention_policy        = optional(string, "30d")<br/>    schedule                = optional(string, "0 2 * * *")<br/>    wal_compression         = optional(string, "gzip")<br/>    data_compression        = optional(string, "gzip")<br/>    jobs                    = optional(number, 2)<br/>    target                  = optional(string, "prefer-standby")<br/>    create_scheduled_backup = optional(bool, true)<br/>    immediate               = optional(bool, false)<br/>  })</pre> | `{}` | no |
-| <a name="input_cluster"></a> [cluster](#input\_cluster) | CloudNative-PG cluster configuration object | <pre>object({<br/>    name                                    = optional(string, "default-cluster")<br/>    namespace                               = optional(string, "default")<br/>    instances                               = optional(number, 1)<br/>    storage_class                           = optional(string, "longhorn") # Override with your cluster's available storage class<br/>    storage_size                            = optional(string, "10Gi")<br/>    inherited_labels                        = optional(map(string), {})<br/>    inherited_annotations                   = optional(map(string), {})<br/>    postgresql_max_connections              = optional(string, "100")<br/>    postgresql_shared_buffers               = optional(string, "256MB")<br/>    postgresql_effective_cache_size         = optional(string, "1GB")<br/>    postgresql_maintenance_work_mem         = optional(string, "64MB")<br/>    postgresql_checkpoint_completion_target = optional(string, "0.9")<br/>    postgresql_wal_buffers                  = optional(string, "16MB")<br/>    postgresql_default_statistics_target    = optional(string, "100")<br/>    postgresql_random_page_cost             = optional(string, "1.1")<br/>    postgresql_effective_io_concurrency     = optional(string, "200")<br/>    postgresql_work_mem                     = optional(string, "2621kB")<br/>    postgresql_min_wal_size                 = optional(string, "512MB")<br/>    postgresql_max_wal_size                 = optional(string, "2GB")<br/>    bootstrap_database                      = optional(string, "postgres")<br/>    bootstrap_owner                         = optional(string, "postgres")<br/>    enable_pod_monitor                      = optional(bool, true)<br/>    pod_monitor_labels                      = optional(map(string), {})<br/>    resources = optional(object({<br/>      requests = optional(object({<br/>        memory = optional(string, "512Mi")<br/>        cpu    = optional(string, "250m")<br/>      }), {})<br/>      limits = optional(object({<br/>        memory = optional(string)<br/>        cpu    = optional(string)<br/>      }), null)<br/>    }), {})<br/>  })</pre> | `{}` | no |
+| <a name="input_cluster"></a> [cluster](#input\_cluster) | CloudNative-PG cluster configuration object | <pre>object({<br/>    name                                    = optional(string, "default-cluster")<br/>    namespace                               = optional(string, "default")<br/>    instances                               = optional(number, 1)<br/>    storage_class                           = optional(string, "longhorn") # Override with your cluster's available storage class<br/>    storage_size                            = optional(string, "10Gi")<br/>    inherited_labels                        = optional(map(string), {})<br/>    inherited_annotations                   = optional(map(string), {})<br/>    postgresql_max_connections              = optional(string, "100")<br/>    postgresql_shared_buffers               = optional(string, "256MB")<br/>    postgresql_effective_cache_size         = optional(string, "1GB")<br/>    postgresql_maintenance_work_mem         = optional(string, "64MB")<br/>    postgresql_checkpoint_completion_target = optional(string, "0.9")<br/>    postgresql_wal_buffers                  = optional(string, "16MB")<br/>    postgresql_default_statistics_target    = optional(string, "100")<br/>    postgresql_random_page_cost             = optional(string, "1.1")<br/>    postgresql_effective_io_concurrency     = optional(string, "200")<br/>    postgresql_work_mem                     = optional(string, "2621kB")<br/>    postgresql_min_wal_size                 = optional(string, "512MB")<br/>    postgresql_max_wal_size                 = optional(string, "2GB")<br/>    image_name                              = optional(string, null)<br/>    shared_preload_libraries                = optional(string, null)<br/>    bootstrap_database                      = optional(string, "postgres")<br/>    bootstrap_owner                         = optional(string, "postgres")<br/>    bootstrap_post_init_sql                 = optional(list(string), [])<br/>    enable_pod_monitor                      = optional(bool, true)<br/>    pod_monitor_labels                      = optional(map(string), {})<br/>    resources = optional(object({<br/>      requests = optional(object({<br/>        memory = optional(string, "512Mi")<br/>        cpu    = optional(string, "250m")<br/>      }), {})<br/>      limits = optional(object({<br/>        memory = optional(string)<br/>        cpu    = optional(string)<br/>      }), null)<br/>    }), {})<br/>  })</pre> | `{}` | no |
 | <a name="input_databases"></a> [databases](#input\_databases) | List of databases to create. Each object must have name, owner, password, and database\_reclaim\_policy.<br/>If the list is empty, the cluster will be created with no managed database users.<br/>Users can manually add roles to the cluster or add databases through this module later. | <pre>list(object({<br/>    name                        = string<br/>    owner                       = string<br/>    password                    = string<br/>    database_reclaim_policy     = optional(string, "retain")<br/>    pg_database_name            = optional(string, "")<br/>    create_connection_secret    = optional(bool, true)<br/>    connection_secret_namespace = optional(string, "")<br/>  }))</pre> | `[]` | no |
 | <a name="input_labels"></a> [labels](#input\_labels) | Additional labels to add to all resources | `map(string)` | `{}` | no |
-
 ## Outputs
 
 | Name | Description |
@@ -197,6 +192,187 @@ No modules.
 | <a name="output_owner_usernames"></a> [owner\_usernames](#output\_owner\_usernames) | Usernames of the database owners |
 | <a name="output_password_secret_names"></a> [password\_secret\_names](#output\_password\_secret\_names) | Names of the Kubernetes secrets containing the database passwords |
 | <a name="output_scheduled_backup_name"></a> [scheduled\_backup\_name](#output\_scheduled\_backup\_name) | Name of the ScheduledBackup resource |
+
+## Examples
+
+### Basic
+```hcl
+# Basic example of using the CloudNative-PG database module
+
+terraform {
+  required_providers {
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0"
+    }
+  }
+}
+
+# Configure providers (adjust to your environment)
+provider "kubernetes" {
+  config_path = "~/.kube/config"
+}
+
+# Create cluster and databases using the module
+module "example_app_database" {
+  source  = "git::ssh://git@github.com/pascalinthecloud/terraform-module-cnpg-database.git?ref=v0.0.7"
+
+  databases = [
+    {
+      name                        = "example-app"
+      owner                       = "example_app_user"
+      password                    = var.database_password
+      database_reclaim_policy     = "retain"
+      create_connection_secret    = true
+      connection_secret_namespace = ""
+    }
+  ]
+
+  cluster = {
+    name                       = "shared-postgres-dev"
+    namespace                  = "databases-dev"
+    instances                  = 1
+    storage_class              = "longhorn"
+    storage_size               = "10Gi"
+    postgresql_max_connections = "100"
+    # Other PostgreSQL parameters use defaults
+  }
+
+  labels = {
+    app         = "example-app"
+    environment = "dev"
+    managed-by  = "terraform"
+  }
+
+  # Backup configuration (optional)
+  backup = {
+    enabled                 = var.backup_enabled
+    s3_endpoint_url         = var.s3_endpoint_url
+    s3_bucket_name          = var.s3_bucket_name
+    s3_access_key_id        = var.s3_access_key_id
+    s3_secret_access_key    = var.s3_secret_access_key
+    retention_policy        = "90d"
+    schedule                = "0 2 * * *" # Daily at 2 AM UTC
+    wal_compression         = "gzip"
+    data_compression        = "gzip"
+    target                  = "prefer-standby"
+    create_scheduled_backup = true
+  }
+}
+
+# Output connection details
+output "connection_host" {
+  description = "Database connection hostname"
+  value       = module.example_app_database.connection_host
+}
+
+output "connection_port" {
+  description = "Database connection port"
+  value       = module.example_app_database.connection_port
+}
+
+output "database_names" {
+  description = "Names of the created databases"
+  value       = module.example_app_database.database_names
+}
+
+output "connection_secret_names" {
+  description = "Names of the connection secrets"
+  value       = module.example_app_database.connection_secret_names
+}
+
+output "connection_uris" {
+  description = "Full PostgreSQL connection URIs"
+  value       = module.example_app_database.connection_uris
+  sensitive   = true
+}
+
+# Backup outputs
+output "backup_enabled" {
+  description = "Whether backups are configured"
+  value       = module.example_app_database.backup_enabled
+}
+
+output "backup_destination" {
+  description = "S3 destination for backups"
+  value       = module.example_app_database.backup_destination_path
+}
+```
+
+### PostGIS
+```hcl
+# Example: PostGIS-enabled CloudNative-PG cluster
+
+terraform {
+  required_providers {
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = ">= 2.0"
+    }
+  }
+}
+
+# Configure providers (adjust to your environment)
+provider "kubernetes" {
+  config_path = "~/.kube/config"
+}
+
+# Create a PostGIS-enabled cluster
+module "postgis_database" {
+  source  = "git::ssh://git@github.com/pascalinthecloud/terraform-module-cnpg-database.git?ref=v0.0.7"
+
+  databases = [
+    {
+      name                    = "geospatial-app"
+      owner                   = "geo_user"
+      password                = var.database_password
+      database_reclaim_policy = "retain"
+    }
+  ]
+
+  cluster = {
+    name          = "postgis-cluster"
+    namespace     = "databases"
+    instances     = 3
+    storage_class = "longhorn"
+    storage_size  = "10Gi"
+
+    # Use the PostGIS image (must match the PG major version)
+    image_name = "ghcr.io/cloudnative-pg/postgis:17-3.5"
+
+    # Create PostGIS and related extensions during bootstrap
+    bootstrap_post_init_sql = [
+      "CREATE EXTENSION IF NOT EXISTS postgis;",
+      "CREATE EXTENSION IF NOT EXISTS postgis_topology;",
+      "CREATE EXTENSION IF NOT EXISTS hstore;",
+      "CREATE EXTENSION IF NOT EXISTS fuzzystrmatch;",
+    ]
+  }
+
+  labels = {
+    app         = "geospatial-app"
+    environment = "production"
+    managed-by  = "terraform"
+  }
+}
+
+# Output connection details
+output "connection_host" {
+  description = "Database connection hostname"
+  value       = module.postgis_database.connection_host
+}
+
+output "connection_port" {
+  description = "Database connection port"
+  value       = module.postgis_database.connection_port
+}
+
+output "connection_uris" {
+  description = "Full PostgreSQL connection URIs"
+  value       = module.postgis_database.connection_uris
+  sensitive   = true
+}
+```
 <!-- END_TF_DOCS -->
 
 ## Backup Configuration

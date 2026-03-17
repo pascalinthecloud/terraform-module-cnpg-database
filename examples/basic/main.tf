@@ -16,7 +16,7 @@ provider "kubernetes" {
 
 # Create cluster and databases using the module
 module "example_app_database" {
-  source = "../.."
+  source  = "git::ssh://git@github.com/pascalinthecloud/terraform-module-cnpg-database.git?ref=v0.0.7"
 
   databases = [
     {

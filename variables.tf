@@ -71,8 +71,11 @@ variable "cluster" {
     postgresql_work_mem                     = optional(string, "2621kB")
     postgresql_min_wal_size                 = optional(string, "512MB")
     postgresql_max_wal_size                 = optional(string, "2GB")
+    image_name                              = optional(string, null)
+    shared_preload_libraries                = optional(string, null)
     bootstrap_database                      = optional(string, "postgres")
     bootstrap_owner                         = optional(string, "postgres")
+    bootstrap_post_init_sql                 = optional(list(string), [])
     enable_pod_monitor                      = optional(bool, true)
     pod_monitor_labels                      = optional(map(string), {})
     resources = optional(object({
