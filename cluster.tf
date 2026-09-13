@@ -55,6 +55,7 @@ resource "kubernetes_manifest" "cluster" {
           work_mem                     = var.cluster.postgresql_work_mem
           min_wal_size                 = var.cluster.postgresql_min_wal_size
           max_wal_size                 = var.cluster.postgresql_max_wal_size
+          max_slot_wal_keep_size       = var.cluster.postgresql_max_slot_wal_keep_size
         }
       }
 

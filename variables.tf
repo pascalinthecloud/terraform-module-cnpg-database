@@ -71,6 +71,7 @@ variable "cluster" {
     postgresql_work_mem                     = optional(string, "2621kB")
     postgresql_min_wal_size                 = optional(string, "512MB")
     postgresql_max_wal_size                 = optional(string, "2GB")
+    postgresql_max_slot_wal_keep_size       = optional(string, "10GB") # Cap WAL kept for an inactive replication slot; -1 (unlimited) lets a down replica fill the primary and halt it
     bootstrap_database                      = optional(string, "postgres")
     bootstrap_owner                         = optional(string, "postgres")
     enable_pod_monitor                      = optional(bool, true)
