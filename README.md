@@ -178,14 +178,14 @@ instances, because the plugin injects a sidecar.
 ## Requirements
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="requirement_terraform"></a> [terraform](#requirement\_terraform) | >= 1.9.0 |
 | <a name="requirement_kubernetes"></a> [kubernetes](#requirement\_kubernetes) | >= 2.0 |
 
 ## Providers
 
 | Name | Version |
-|------|---------|
+| ---- | ------- |
 | <a name="provider_kubernetes"></a> [kubernetes](#provider\_kubernetes) | >= 2.0 |
 
 ## Modules
@@ -195,9 +195,10 @@ No modules.
 ## Resources
 
 | Name | Type |
-|------|------|
+| ---- | ---- |
 | [kubernetes_manifest.cluster](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.database](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
+| [kubernetes_manifest.object_store](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.pod_monitor](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.scheduled_backup](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_role_binding_v1.backup_secret_reader](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/role_binding_v1) | resource |
@@ -209,8 +210,8 @@ No modules.
 ## Inputs
 
 | Name | Description | Type | Default | Required |
-|------|-------------|------|---------|:--------:|
-| <a name="input_backup"></a> [backup](#input\_backup) | Backup configuration for S3-based backups using Barman | <pre>object({<br/>    enabled                 = optional(bool, false)<br/>    s3_endpoint_url         = optional(string, "")<br/>    s3_bucket_name          = optional(string, "")<br/>    s3_access_key_id        = optional(string, "")<br/>    s3_secret_access_key    = optional(string, "")<br/>    retention_policy        = optional(string, "30d")<br/>    schedule                = optional(string, "0 2 * * *")<br/>    wal_compression         = optional(string, "gzip")<br/>    data_compression        = optional(string, "gzip")<br/>    jobs                    = optional(number, 2)<br/>    target                  = optional(string, "prefer-standby")<br/>    create_scheduled_backup = optional(bool, true)<br/>    immediate               = optional(bool, false)<br/>  })</pre> | `{}` | no |
+| ---- | ----------- | ---- | ------- | :------: |
+| <a name="input_backup"></a> [backup](#input\_backup) | Backup configuration for S3-based backups using Barman | <pre>object({<br/>    enabled                 = optional(bool, false)<br/>    s3_endpoint_url         = optional(string, "")<br/>    s3_bucket_name          = optional(string, "")<br/>    s3_access_key_id        = optional(string, "")<br/>    s3_secret_access_key    = optional(string, "")<br/>    retention_policy        = optional(string, "30d")<br/>    schedule                = optional(string, "0 2 * * *")<br/>    wal_compression         = optional(string, "gzip")<br/>    data_compression        = optional(string, "gzip")<br/>    jobs                    = optional(number, 2)<br/>    target                  = optional(string, "prefer-standby")<br/>    create_scheduled_backup = optional(bool, true)<br/>    immediate               = optional(bool, false)<br/>    # "barmanObjectStore" = in-tree Barman Cloud (deprecated in CNPG 1.26, removed in 1.31)<br/>    # "plugin"            = Barman Cloud Plugin (barman-cloud.cloudnative-pg.io), which must be installed<br/>    method = optional(string, "barmanObjectStore")<br/>  })</pre> | `{}` | no |
 | <a name="input_cluster"></a> [cluster](#input\_cluster) | CloudNative-PG cluster configuration object | <pre>object({<br/>    name                                    = optional(string, "default-cluster")<br/>    namespace                               = optional(string, "default")<br/>    instances                               = optional(number, 1)<br/>    storage_class                           = optional(string, "longhorn") # Override with your cluster's available storage class<br/>    storage_size                            = optional(string, "10Gi")<br/>    inherited_labels                        = optional(map(string), {})<br/>    inherited_annotations                   = optional(map(string), {})<br/>    postgresql_max_connections              = optional(string, "100")<br/>    postgresql_shared_buffers               = optional(string, "256MB")<br/>    postgresql_effective_cache_size         = optional(string, "1GB")<br/>    postgresql_maintenance_work_mem         = optional(string, "64MB")<br/>    postgresql_checkpoint_completion_target = optional(string, "0.9")<br/>    postgresql_wal_buffers                  = optional(string, "16MB")<br/>    postgresql_default_statistics_target    = optional(string, "100")<br/>    postgresql_random_page_cost             = optional(string, "1.1")<br/>    postgresql_effective_io_concurrency     = optional(string, "200")<br/>    postgresql_work_mem                     = optional(string, "2621kB")<br/>    postgresql_min_wal_size                 = optional(string, "512MB")<br/>    postgresql_max_wal_size                 = optional(string, "2GB")<br/>    postgresql_max_slot_wal_keep_size       = optional(string, "10GB") # Cap WAL kept for an inactive replication slot; -1 (unlimited) lets a down replica fill the primary and halt it<br/>    bootstrap_database                      = optional(string, "postgres")<br/>    bootstrap_owner                         = optional(string, "postgres")<br/>    enable_pod_monitor                      = optional(bool, true)<br/>    pod_monitor_labels                      = optional(map(string), {})<br/>    resources = optional(object({<br/>      requests = optional(object({<br/>        memory = optional(string, "512Mi")<br/>        cpu    = optional(string, "250m")<br/>      }), {})<br/>      limits = optional(object({<br/>        memory = optional(string)<br/>        cpu    = optional(string)<br/>      }), null)<br/>    }), {})<br/>  })</pre> | `{}` | no |
 | <a name="input_databases"></a> [databases](#input\_databases) | List of databases to create. Each object must have name, owner, password, and database\_reclaim\_policy.<br/>If the list is empty, the cluster will be created with no managed database users.<br/>Users can manually add roles to the cluster or add databases through this module later. | <pre>list(object({<br/>    name                        = string<br/>    owner                       = string<br/>    password                    = string<br/>    database_reclaim_policy     = optional(string, "retain")<br/>    pg_database_name            = optional(string, "")<br/>    create_connection_secret    = optional(bool, true)<br/>    connection_secret_namespace = optional(string, "")<br/>  }))</pre> | `[]` | no |
 | <a name="input_labels"></a> [labels](#input\_labels) | Additional labels to add to all resources | `map(string)` | `{}` | no |
@@ -218,9 +219,10 @@ No modules.
 ## Outputs
 
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 | <a name="output_backup_destination_path"></a> [backup\_destination\_path](#output\_backup\_destination\_path) | S3 destination path for backups |
 | <a name="output_backup_enabled"></a> [backup\_enabled](#output\_backup\_enabled) | Whether backups are configured for this cluster |
+| <a name="output_backup_object_store_name"></a> [backup\_object\_store\_name](#output\_backup\_object\_store\_name) | Name of the Barman Cloud Plugin ObjectStore (null unless backup.method = "plugin") |
 | <a name="output_backup_secret_name"></a> [backup\_secret\_name](#output\_backup\_secret\_name) | Name of the Kubernetes secret containing backup credentials |
 | <a name="output_connection_host"></a> [connection\_host](#output\_connection\_host) | Database connection hostname |
 | <a name="output_connection_port"></a> [connection\_port](#output\_connection\_port) | Database connection port |
