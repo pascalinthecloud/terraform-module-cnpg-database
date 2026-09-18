@@ -282,25 +282,29 @@ When `backup.enabled = true`, the module creates:
 
 ### Backup Schedule Examples
 
+CloudNativePG schedules use **6-field cron** with a leading seconds field
+(`sec min hour day month weekday`). A 5-field expression is read with the fields
+shifted, so `"0 2 * * *"` runs hourly at minute 2, not daily at 02:00.
+
 ```hcl
 # Daily at 2 AM UTC
 backup = {
-  schedule = "0 2 * * *"
+  schedule = "0 0 2 * * *"
 }
 
 # Every 6 hours
 backup = {
-  schedule = "0 */6 * * *"
+  schedule = "0 0 */6 * * *"
 }
 
 # Weekly on Sunday at 3 AM
 backup = {
-  schedule = "0 3 * * 0"
+  schedule = "0 0 3 * * 0"
 }
 
 # Monthly on the 1st at 1 AM
 backup = {
-  schedule = "0 1 1 * *"
+  schedule = "0 0 1 1 * *"
 }
 ```
 
