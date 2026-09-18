@@ -128,7 +128,7 @@ module "my_app_database" {
     s3_access_key_id     = var.s3_access_key_id
     s3_secret_access_key = var.s3_secret_access_key
     retention_policy     = "30d"
-    schedule             = "0 2 * * *"  # Daily at 2 AM UTC
+    schedule             = "0 0 2 * * *"  # Daily at 2 AM UTC (CNPG uses 6-field cron: leading seconds)
     target               = "prefer-standby"
     wal_compression      = "gzip"
     data_compression     = "gzip"
