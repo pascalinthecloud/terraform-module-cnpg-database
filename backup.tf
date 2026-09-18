@@ -80,7 +80,7 @@ resource "kubernetes_manifest" "scheduled_backup" {
       namespace = var.cluster.namespace
       labels    = var.labels
     }
-    spec = {
+    spec = merge({
       # Cron schedule for backups
       schedule = var.backup.schedule
 
@@ -93,15 +93,17 @@ resource "kubernetes_manifest" "scheduled_backup" {
       }
 
       # Backup method: in-tree Barman Cloud or the Barman Cloud Plugin
-      method              = local.backup_plugin ? "plugin" : "barmanObjectStore"
-      pluginConfiguration = local.backup_plugin ? { name = local.barman_plugin_name } : null
+      method = local.backup_plugin ? "plugin" : "barmanObjectStore"
 
       # Take backup immediately on creation
       immediate = var.backup.immediate
 
       # Target instance for backups (prefer-standby reduces load on primary)
       target = var.backup.target
-    }
+      },
+      # pluginConfiguration only in plugin mode (omitted, not null, otherwise)
+      [{}, { pluginConfiguration = { name = local.barman_plugin_name } }][local.backup_plugin ? 1 : 0],
+    )
   }
 
   depends_on = [

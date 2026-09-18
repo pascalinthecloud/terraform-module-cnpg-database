@@ -17,7 +17,10 @@ resource "kubernetes_manifest" "cluster" {
       namespace = var.cluster.namespace
       labels    = var.labels
     }
-    spec = {
+    # spec is merged from fragments so that optional sections are omitted rather than
+    # set to null: for an existing object kubernetes_manifest sends an explicit null,
+    # which the CNPG CRD rejects ("spec.backup in body must be of type object").
+    spec = merge({
       instances = var.cluster.instances
 
       # Inherited metadata for PVCs and other resources
@@ -89,64 +92,75 @@ resource "kubernetes_manifest" "cluster" {
         }]
       }
 
-      # In-tree Barman Cloud backup (backup.method = "barmanObjectStore").
-      # In plugin mode spec.backup is omitted entirely: the configuration lives in the
-      # ObjectStore and the target is set on the ScheduledBackup.
-      backup = local.backup_in_tree ? {
-        barmanObjectStore = {
-          # S3 destination
-          destinationPath = "s3://${var.backup.s3_bucket_name}/"
-          endpointURL     = var.backup.s3_endpoint_url != "" ? var.backup.s3_endpoint_url : null
-          serverName      = var.cluster.name
+      },
+      # spec.backup: omitted when backups are disabled; plugin mode keeps only the
+      # target (the configuration lives in the ObjectStore); in-tree mode carries the
+      # full barmanObjectStore block. Selected by index so each shape keeps its own type.
+      [
+        {},
+        { backup = { target = var.backup.target } },
+        {
+          backup = {
+            barmanObjectStore = {
+              # S3 destination
+              destinationPath = "s3://${var.backup.s3_bucket_name}/"
+              endpointURL     = var.backup.s3_endpoint_url != "" ? var.backup.s3_endpoint_url : null
+              serverName      = var.cluster.name
 
-          # S3 credentials reference
-          s3Credentials = {
-            accessKeyId = {
-              name = kubernetes_secret_v1.backup_credentials[0].metadata[0].name
-              key  = "ACCESS_KEY_ID"
+              # S3 credentials reference
+              s3Credentials = {
+                accessKeyId = {
+                  name = local.backup_secret_name
+                  key  = "ACCESS_KEY_ID"
+                }
+                secretAccessKey = {
+                  name = local.backup_secret_name
+                  key  = "ACCESS_SECRET_KEY"
+                }
+              }
+
+              # WAL (Write-Ahead Log) configuration
+              wal = {
+                compression = var.backup.wal_compression
+                # WAL upload parallelism is intentionally limited to 2 to avoid excessive I/O/CPU pressure
+                # and to follow CNPG/Barman recommendations. Data backup parallelism is configured separately
+                # via var.backup.jobs in the "data" block below.
+                maxParallel = 2
+              }
+
+              # Data backup configuration
+              data = {
+                compression         = var.backup.data_compression
+                jobs                = var.backup.jobs
+                immediateCheckpoint = false
+              }
             }
-            secretAccessKey = {
-              name = kubernetes_secret_v1.backup_credentials[0].metadata[0].name
-              key  = "ACCESS_SECRET_KEY"
-            }
+
+            # Retention policy
+            retentionPolicy = var.backup.retention_policy
+
+            # Backup target
+            target = var.backup.target
           }
-
-          # WAL (Write-Ahead Log) configuration
-          wal = {
-            compression = var.backup.wal_compression
-            # WAL upload parallelism is intentionally limited to 2 to avoid excessive I/O/CPU pressure
-            # and to follow CNPG/Barman recommendations. Data backup parallelism is configured separately
-            # via var.backup.jobs in the "data" block below.
-            maxParallel = 2
-          }
-
-          # Data backup configuration
-          data = {
-            compression         = var.backup.data_compression
-            jobs                = var.backup.jobs
-            immediateCheckpoint = false
-          }
-        }
-
-        # Retention policy
-        retentionPolicy = var.backup.retention_policy
-
-        # Backup target
-        target = var.backup.target
-      } : null
-
-      # Barman Cloud Plugin as WAL archiver (backup.method = "plugin").
+        },
+      ][local.backup_spec_index],
+      # spec.plugins: the Barman Cloud Plugin as WAL archiver (backup.method = "plugin").
       # serverName pinned to the cluster name = the same object-store folder the
       # in-tree integration wrote to, so the WAL archive and backup catalog continue.
-      plugins = local.backup_plugin ? [{
-        name          = local.barman_plugin_name
-        isWALArchiver = true
-        parameters = {
-          barmanObjectName = local.object_store_name
-          serverName       = var.cluster.name
-        }
-      }] : null
-    }
+      [
+        {},
+        {
+          plugins = [{
+            name          = local.barman_plugin_name
+            isWALArchiver = true
+            parameters = {
+              barmanObjectName = local.object_store_name
+              serverName       = var.cluster.name
+            }
+          }]
+        },
+      ][local.backup_plugin ? 1 : 0],
+    )
   }
 }
 

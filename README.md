@@ -164,8 +164,8 @@ CloudNativePG deprecated its in-tree Barman Cloud support in 1.26 and removes it
 
 In plugin mode the module creates an `ObjectStore` named `<cluster>-backup`
 (the retention policy lives there), registers the plugin as the cluster's WAL
-archiver with `serverName` = cluster name, omits `spec.backup` from the Cluster,
-and switches the `ScheduledBackup` to `method: plugin`.
+archiver with `serverName` = cluster name, reduces `spec.backup` on the Cluster to
+just `target`, and switches the `ScheduledBackup` to `method: plugin`.
 
 **Migrating an existing cluster:** changing `method` from `"barmanObjectStore"`
 to `"plugin"` is the single atomic switch described in the

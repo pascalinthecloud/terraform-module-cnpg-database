@@ -9,6 +9,13 @@ locals {
   backup_in_tree = nonsensitive(var.backup.enabled && var.backup.method == "barmanObjectStore")
   backup_plugin  = nonsensitive(var.backup.enabled && var.backup.method == "plugin")
 
+  # 0 = backups disabled, 1 = plugin, 2 = in-tree barmanObjectStore
+  backup_spec_index = local.backup_in_tree ? 2 : (local.backup_plugin ? 1 : 0)
+
+  # Via a conditional (not a bare [0] index) because the in-tree spec fragment is
+  # evaluated even when unused, and the secret doesn't exist with backups disabled.
+  backup_secret_name = nonsensitive(var.backup.enabled) ? kubernetes_secret_v1.backup_credentials[0].metadata[0].name : ""
+
   barman_plugin_name = "barman-cloud.cloudnative-pg.io"
   object_store_name  = "${var.cluster.name}-backup"
 }
