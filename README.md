@@ -141,6 +141,39 @@ module "my_app_database" {
 }
 ```
 
+### Backups via the Barman Cloud Plugin
+
+CloudNativePG deprecated its in-tree Barman Cloud support in 1.26 and removes it in
+1.31. Set `backup.method = "plugin"` to use the
+[Barman Cloud Plugin](https://cloudnative-pg.io/plugin-barman-cloud/) instead
+(the plugin must be installed in the cluster). The default stays
+`"barmanObjectStore"`, so existing configurations produce no diff.
+
+```hcl
+  backup = {
+    enabled              = true
+    method               = "plugin"
+    s3_endpoint_url      = "https://s3.amazonaws.com"
+    s3_bucket_name       = "my-postgres-backups"
+    s3_access_key_id     = var.s3_access_key_id
+    s3_secret_access_key = var.s3_secret_access_key
+    retention_policy     = "30d"
+    schedule             = "0 0 2 * * *" # CNPG uses 6-field cron (leading seconds)
+  }
+```
+
+In plugin mode the module creates an `ObjectStore` named `<cluster>-backup`
+(the retention policy lives there), registers the plugin as the cluster's WAL
+archiver with `serverName` = cluster name, omits `spec.backup` from the Cluster,
+and switches the `ScheduledBackup` to `method: plugin`.
+
+**Migrating an existing cluster:** changing `method` from `"barmanObjectStore"`
+to `"plugin"` is the single atomic switch described in the
+[upstream migration guide](https://cloudnative-pg.io/plugin-barman-cloud/docs/migration/).
+The destination path and server name are unchanged, so the WAL archive and backup
+catalog continue in place. The switch triggers a rolling restart of the
+instances, because the plugin injects a sidecar.
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 

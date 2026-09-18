@@ -64,3 +64,8 @@ output "backup_destination_path" {
   value       = var.backup.enabled ? "s3://${var.backup.s3_bucket_name}/" : null
   sensitive   = true
 }
+
+output "backup_object_store_name" {
+  description = "Name of the Barman Cloud Plugin ObjectStore (null unless backup.method = \"plugin\")"
+  value       = local.backup_plugin ? local.object_store_name : null
+}
