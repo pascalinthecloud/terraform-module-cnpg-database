@@ -1,6 +1,6 @@
 # Create the PostgreSQL cluster with managed roles
 resource "kubernetes_manifest" "cluster" {
-  depends_on = [kubernetes_secret_v1.database_password]
+  depends_on = [kubernetes_secret_v1.database_password, kubernetes_manifest.object_store]
 
   # Ignore server-side defaults added by CNPG operator
   computed_fields = [
@@ -89,8 +89,10 @@ resource "kubernetes_manifest" "cluster" {
         }]
       }
 
-      # Backup configuration (conditional based on backup.enabled)
-      backup = var.backup.enabled ? {
+      # In-tree Barman Cloud backup (backup.method = "barmanObjectStore").
+      # In plugin mode spec.backup is omitted entirely: the configuration lives in the
+      # ObjectStore and the target is set on the ScheduledBackup.
+      backup = local.backup_in_tree ? {
         barmanObjectStore = {
           # S3 destination
           destinationPath = "s3://${var.backup.s3_bucket_name}/"
@@ -132,6 +134,18 @@ resource "kubernetes_manifest" "cluster" {
         # Backup target
         target = var.backup.target
       } : null
+
+      # Barman Cloud Plugin as WAL archiver (backup.method = "plugin").
+      # serverName pinned to the cluster name = the same object-store folder the
+      # in-tree integration wrote to, so the WAL archive and backup catalog continue.
+      plugins = local.backup_plugin ? [{
+        name          = local.barman_plugin_name
+        isWALArchiver = true
+        parameters = {
+          barmanObjectName = local.object_store_name
+          serverName       = var.cluster.name
+        }
+      }] : null
     }
   }
 }

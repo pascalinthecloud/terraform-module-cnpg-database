@@ -92,8 +92,9 @@ resource "kubernetes_manifest" "scheduled_backup" {
         name = var.cluster.name
       }
 
-      # Backup method (barmanObjectStore = S3-based backups)
-      method = "barmanObjectStore"
+      # Backup method: in-tree Barman Cloud or the Barman Cloud Plugin
+      method              = local.backup_plugin ? "plugin" : "barmanObjectStore"
+      pluginConfiguration = local.backup_plugin ? { name = local.barman_plugin_name } : null
 
       # Take backup immediately on creation
       immediate = var.backup.immediate
@@ -107,3 +108,50 @@ resource "kubernetes_manifest" "scheduled_backup" {
     kubernetes_manifest.cluster
   ]
 }
+
+# Barman Cloud Plugin object store (backup.method = "plugin").
+# A direct translation of the in-tree .spec.backup.barmanObjectStore block; the
+# retention policy moves here from the Cluster.
+resource "kubernetes_manifest" "object_store" {
+  count = local.backup_plugin ? 1 : 0
+
+  manifest = {
+    apiVersion = "barmancloud.cnpg.io/v1"
+    kind       = "ObjectStore"
+    metadata = {
+      name      = local.object_store_name
+      namespace = var.cluster.namespace
+      labels    = var.labels
+    }
+    spec = {
+      retentionPolicy = var.backup.retention_policy
+      configuration = {
+        destinationPath = "s3://${var.backup.s3_bucket_name}/"
+        endpointURL     = var.backup.s3_endpoint_url != "" ? var.backup.s3_endpoint_url : null
+
+        s3Credentials = {
+          accessKeyId = {
+            name = kubernetes_secret_v1.backup_credentials[0].metadata[0].name
+            key  = "ACCESS_KEY_ID"
+          }
+          secretAccessKey = {
+            name = kubernetes_secret_v1.backup_credentials[0].metadata[0].name
+            key  = "ACCESS_SECRET_KEY"
+          }
+        }
+
+        wal = {
+          compression = var.backup.wal_compression
+          maxParallel = 2
+        }
+
+        data = {
+          compression         = var.backup.data_compression
+          jobs                = var.backup.jobs
+          immediateCheckpoint = false
+        }
+      }
+    }
+  }
+}
+

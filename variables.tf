@@ -122,6 +122,9 @@ variable "backup" {
     target                  = optional(string, "prefer-standby")
     create_scheduled_backup = optional(bool, true)
     immediate               = optional(bool, false)
+    # "barmanObjectStore" = in-tree Barman Cloud (deprecated in CNPG 1.26, removed in 1.31)
+    # "plugin"            = Barman Cloud Plugin (barman-cloud.cloudnative-pg.io), which must be installed
+    method = optional(string, "barmanObjectStore")
   })
   default   = {}
   sensitive = true
@@ -129,6 +132,11 @@ variable "backup" {
   validation {
     condition     = !var.backup.enabled || can(regex("^[1-9][0-9]*[dwm]$", var.backup.retention_policy))
     error_message = "Retention policy must be in format '<number><unit>' where unit is d (days), w (weeks), or m (months)."
+  }
+
+  validation {
+    condition     = contains(["barmanObjectStore", "plugin"], var.backup.method)
+    error_message = "Backup method must be one of: barmanObjectStore, plugin."
   }
 
   validation {
