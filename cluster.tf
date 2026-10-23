@@ -93,6 +93,10 @@ resource "kubernetes_manifest" "cluster" {
       }
 
       },
+      # spec.switchoverDelay: omitted unless set, so CNPG keeps its default (3600 s).
+      # While it runs, a wedged old primary holds the primary lease and blocks the
+      # failover target from promoting.
+      var.cluster.switchover_delay != null ? { switchoverDelay = var.cluster.switchover_delay } : {},
       # spec.backup: omitted when backups are disabled; plugin mode keeps only the
       # target (the configuration lives in the ObjectStore); in-tree mode carries the
       # full barmanObjectStore block. Selected by index so each shape keeps its own type.

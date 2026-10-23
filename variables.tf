@@ -76,6 +76,7 @@ variable "cluster" {
     bootstrap_owner                         = optional(string, "postgres")
     enable_pod_monitor                      = optional(bool, true)
     pod_monitor_labels                      = optional(map(string), {})
+    switchover_delay                        = optional(number) # spec.switchoverDelay: seconds the old primary gets to shut down on a switchover/failover; null = CNPG default (3600)
     resources = optional(object({
       requests = optional(object({
         memory = optional(string, "512Mi")
@@ -88,6 +89,11 @@ variable "cluster" {
     }), {})
   })
   default = {}
+
+  validation {
+    condition     = var.cluster.switchover_delay == null ? true : var.cluster.switchover_delay > 0
+    error_message = "switchover_delay must be a positive number of seconds (or null for the CNPG default)."
+  }
 
   validation {
     condition     = can(regex("^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", var.cluster.name))
