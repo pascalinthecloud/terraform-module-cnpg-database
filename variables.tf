@@ -77,6 +77,7 @@ variable "cluster" {
     enable_pod_monitor                      = optional(bool, true)
     pod_monitor_labels                      = optional(map(string), {})
     switchover_delay                        = optional(number) # spec.switchoverDelay: seconds the old primary gets to shut down on a switchover/failover; null = CNPG default (3600)
+    image_name                              = optional(string) # spec.imageName: PostgreSQL operand image, e.g. ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie; null = CNPG default, fixed at creation
     resources = optional(object({
       requests = optional(object({
         memory = optional(string, "512Mi")
@@ -93,6 +94,11 @@ variable "cluster" {
   validation {
     condition     = var.cluster.switchover_delay == null ? true : var.cluster.switchover_delay > 0
     error_message = "switchover_delay must be a positive number of seconds (or null for the CNPG default)."
+  }
+
+  validation {
+    condition     = var.cluster.image_name == null ? true : can(regex("(:[A-Za-z0-9_][A-Za-z0-9_.-]*|@sha256:[a-f0-9]{64})$", var.cluster.image_name)) && !endswith(var.cluster.image_name, ":latest")
+    error_message = "image_name must carry an explicit tag or digest (not :latest): CNPG only does a controlled rolling update when the image reference changes."
   }
 
   validation {
