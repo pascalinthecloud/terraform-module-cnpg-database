@@ -69,3 +69,22 @@ output "backup_object_store_name" {
   description = "Name of the Barman Cloud Plugin ObjectStore (null unless backup.method = \"plugin\")"
   value       = local.backup_plugin ? local.object_store_name : null
 }
+
+# ============================================
+# Recovery Outputs
+# ============================================
+
+output "recovery_enabled" {
+  description = "Whether the cluster was bootstrapped from an object store instead of initdb"
+  value       = local.recovery_enabled
+}
+
+output "recovery_source_server_name" {
+  description = "serverName in the object store the cluster was recovered from (null unless recovery is enabled)"
+  value       = local.recovery_enabled ? local.recovery_source_name : null
+}
+
+output "recovery_credentials_secret_name" {
+  description = "Name of the Kubernetes secret holding the credentials for the source object store (null unless recovery is enabled)"
+  value       = local.recovery_enabled ? local.recovery_secret_name : null
+}

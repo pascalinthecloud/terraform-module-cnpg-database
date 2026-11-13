@@ -1,6 +1,6 @@
 # Create the PostgreSQL cluster with managed roles
 resource "kubernetes_manifest" "cluster" {
-  depends_on = [kubernetes_secret_v1.database_password, kubernetes_manifest.object_store]
+  depends_on = [kubernetes_secret_v1.database_password, kubernetes_manifest.object_store, kubernetes_secret_v1.recovery_credentials]
 
   # Ignore server-side defaults added by CNPG operator
   computed_fields = [
@@ -62,14 +62,6 @@ resource "kubernetes_manifest" "cluster" {
         }
       }
 
-      # Bootstrap
-      bootstrap = {
-        initdb = {
-          database = var.cluster.bootstrap_database
-          owner    = var.cluster.bootstrap_owner
-        }
-      }
-
       # Monitoring
       # When custom pod_monitor_labels are set, disable the auto-generated PodMonitor
       # and create a custom one (see below) with the desired labels instead.
@@ -93,6 +85,56 @@ resource "kubernetes_manifest" "cluster" {
       }
 
       },
+      # spec.bootstrap: initdb for a new, empty cluster; recovery when the cluster is
+      # restored from an object store. Recovery needs spec.externalClusters as well, so
+      # both keys come from the same fragment. Selected by index so each shape keeps
+      # its own type. Recovery is a one-time bootstrap: CNPG only reads it while
+      # creating the cluster, never again.
+      [
+        {
+          bootstrap = {
+            initdb = {
+              database = var.cluster.bootstrap_database
+              owner    = var.cluster.bootstrap_owner
+            }
+          }
+        },
+        {
+          bootstrap = {
+            recovery = merge(
+              { source = local.recovery_source_name },
+              # recoveryTarget omitted entirely = recover to the end of the WAL archive
+              length(local.recovery_target) > 0 ? { recoveryTarget = local.recovery_target } : {},
+            )
+          }
+          externalClusters = [
+            {
+              name = local.recovery_source_name
+              barmanObjectStore = {
+                destinationPath = "s3://${var.recovery.s3_bucket_name}/"
+                endpointURL     = var.recovery.s3_endpoint_url != "" ? var.recovery.s3_endpoint_url : null
+                # The folder inside the bucket, i.e. the source cluster's serverName.
+                serverName = local.recovery_source_name
+
+                s3Credentials = {
+                  accessKeyId = {
+                    name = local.recovery_secret_name
+                    key  = "ACCESS_KEY_ID"
+                  }
+                  secretAccessKey = {
+                    name = local.recovery_secret_name
+                    key  = "ACCESS_SECRET_KEY"
+                  }
+                }
+
+                wal = {
+                  maxParallel = var.recovery.wal_max_parallel
+                }
+              }
+            }
+          ]
+        },
+      ][local.recovery_enabled ? 1 : 0],
       # spec.switchoverDelay: omitted unless set, so CNPG keeps its default (3600 s).
       # While it runs, a wedged old primary holds the primary lease and blocks the
       # failover target from promoting.
