@@ -18,4 +18,34 @@ locals {
 
   barman_plugin_name = "barman-cloud.cloudnative-pg.io"
   object_store_name  = "${var.cluster.name}-backup"
+
+  # Recovery mode. nonsensitive() because var.recovery is sensitive (it carries S3 keys)
+  # and these drive count/index expressions; they contain no secret material.
+  recovery_enabled       = nonsensitive(var.recovery.enabled)
+  recovery_create_secret = nonsensitive(var.recovery.enabled && var.recovery.credentials_secret == "")
+
+  # Name of the external cluster in spec.externalClusters and of the folder in the
+  # object store. nonsensitive() so it can be used as a map key / resource name.
+  recovery_source_name = nonsensitive(var.recovery.source_server_name)
+
+  # Via a conditional (not a bare [0] index) because the recovery spec fragment is
+  # evaluated even when unused, and the secret doesn't exist with recovery disabled.
+  recovery_secret_name = (local.recovery_create_secret
+    ? kubernetes_secret_v1.recovery_credentials[0].metadata[0].name
+    : nonsensitive(var.recovery.credentials_secret)
+  )
+
+  # spec.bootstrap.recovery.recoveryTarget: only the keys that were set. An explicit
+  # null would be sent to the API server and rejected by the CRD.
+  recovery_target = {
+    for k, v in {
+      backupID        = var.recovery.backup_id
+      targetTime      = var.recovery.target_time
+      targetLSN       = var.recovery.target_lsn
+      targetName      = var.recovery.target_name
+      targetXID       = var.recovery.target_xid
+      targetImmediate = var.recovery.target_immediate
+      exclusive       = var.recovery.target_exclusive
+    } : k => v if v != null
+  }
 }

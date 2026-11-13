@@ -180,3 +180,96 @@ variable "backup" {
     error_message = "When backup is enabled, s3_bucket_name, s3_access_key_id, and s3_secret_access_key must all be provided."
   }
 }
+
+variable "recovery" {
+  description = <<-EOT
+    Bootstrap the cluster from an existing Barman object store instead of initdb - a DRP restore
+    or a clone of another cluster. When enabled, spec.bootstrap.recovery plus spec.externalClusters
+    replace spec.bootstrap.initdb, and var.cluster.bootstrap_database/bootstrap_owner are ignored.
+
+    Recovery only happens once, when the cluster is first created: changing these values afterwards
+    does not re-run it, the cluster has to be destroyed and created again.
+
+    Leave every target_* and backup_id unset to recover to the end of the WAL archive.
+
+    The restored cluster keeps the roles, passwords and databases of the source. Combine it with
+    databases = [] so the module does not create Database objects or reset owner passwords on
+    restored data.
+  EOT
+  type = object({
+    enabled = optional(bool, false)
+
+    # serverName of the source cluster inside the object store - the folder the source
+    # archived into, which is the source cluster's own name unless it was overridden.
+    source_server_name = optional(string, "")
+
+    # Source object store. The credentials only need read access.
+    s3_bucket_name       = optional(string, "")
+    s3_endpoint_url      = optional(string, "")
+    s3_access_key_id     = optional(string, "")
+    s3_secret_access_key = optional(string, "")
+    # Use an existing secret (keys ACCESS_KEY_ID / ACCESS_SECRET_KEY) instead of the
+    # access keys above, e.g. the backup credentials secret of the source cluster.
+    credentials_secret = optional(string, "")
+
+    wal_max_parallel = optional(number, 2)
+
+    # spec.bootstrap.recovery.recoveryTarget - at most one of these
+    target_time      = optional(string) # e.g. "2026-11-13 09:30:00+00"
+    target_lsn       = optional(string)
+    target_name      = optional(string)
+    target_xid       = optional(string)
+    target_immediate = optional(bool)
+    target_exclusive = optional(bool) # whether the target itself is included
+    backup_id        = optional(string)
+  })
+  default   = {}
+  sensitive = true
+
+  validation {
+    condition     = !var.recovery.enabled || var.recovery.source_server_name != ""
+    error_message = "When recovery is enabled, source_server_name must be set to the serverName the source cluster archived under."
+  }
+
+  validation {
+    condition     = !var.recovery.enabled || var.recovery.s3_bucket_name != ""
+    error_message = "When recovery is enabled, s3_bucket_name must be set: it forms the destinationPath of the source object store."
+  }
+
+  validation {
+    condition = !var.recovery.enabled || var.recovery.credentials_secret != "" || (
+      var.recovery.s3_access_key_id != "" && var.recovery.s3_secret_access_key != ""
+    )
+    error_message = "When recovery is enabled, set either credentials_secret or both s3_access_key_id and s3_secret_access_key."
+  }
+
+  validation {
+    condition = length([
+      for v in [
+        var.recovery.target_time,
+        var.recovery.target_lsn,
+        var.recovery.target_name,
+        var.recovery.target_xid,
+        var.recovery.target_immediate,
+      ] : v if v != null
+    ]) <= 1
+    error_message = "Set at most one recovery target (target_time, target_lsn, target_name, target_xid, target_immediate). Leave all unset to recover to the end of the WAL archive."
+  }
+
+  validation {
+    condition     = !var.recovery.enabled || var.recovery.wal_max_parallel >= 1
+    error_message = "wal_max_parallel must be at least 1."
+  }
+
+  # The restored cluster archives under serverName = var.cluster.name. If that is the
+  # folder it recovers from, it would overwrite the source's own backup catalog.
+  validation {
+    condition = !(
+      var.recovery.enabled &&
+      var.backup.enabled &&
+      var.backup.s3_bucket_name == var.recovery.s3_bucket_name &&
+      var.cluster.name == var.recovery.source_server_name
+    )
+    error_message = "A restored cluster must not archive into the object store folder it recovers from. Give the cluster a different name than recovery.source_server_name, or disable backup."
+  }
+}

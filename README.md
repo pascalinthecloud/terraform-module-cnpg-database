@@ -11,7 +11,7 @@ Terraform module for creating PostgreSQL databases in CloudNative-PG clusters wi
 - ✅ Input validation for security best practices
 - 💾 S3-based backup configuration with CloudNativePG/Barman
 - 📅 Automated scheduled backups with retention policies
-- 🔄 Point-in-Time Recovery (PITR) support
+- 🔄 Restore and Point-in-Time Recovery (PITR) from an object store
 
 ## Prerequisites
 
@@ -202,10 +202,13 @@ No modules.
 | [kubernetes_manifest.pod_monitor](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_manifest.scheduled_backup](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/manifest) | resource |
 | [kubernetes_role_binding_v1.backup_secret_reader](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/role_binding_v1) | resource |
+| [kubernetes_role_binding_v1.recovery_secret_reader](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/role_binding_v1) | resource |
 | [kubernetes_role_v1.backup_secret_reader](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/role_v1) | resource |
+| [kubernetes_role_v1.recovery_secret_reader](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/role_v1) | resource |
 | [kubernetes_secret_v1.backup_credentials](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
 | [kubernetes_secret_v1.connection](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
 | [kubernetes_secret_v1.database_password](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
+| [kubernetes_secret_v1.recovery_credentials](https://registry.terraform.io/providers/hashicorp/kubernetes/latest/docs/resources/secret_v1) | resource |
 
 ## Inputs
 
@@ -215,6 +218,7 @@ No modules.
 | <a name="input_cluster"></a> [cluster](#input\_cluster) | CloudNative-PG cluster configuration object | <pre>object({<br/>    name                                    = optional(string, "default-cluster")<br/>    namespace                               = optional(string, "default")<br/>    instances                               = optional(number, 1)<br/>    storage_class                           = optional(string, "longhorn") # Override with your cluster's available storage class<br/>    storage_size                            = optional(string, "10Gi")<br/>    inherited_labels                        = optional(map(string), {})<br/>    inherited_annotations                   = optional(map(string), {})<br/>    postgresql_max_connections              = optional(string, "100")<br/>    postgresql_shared_buffers               = optional(string, "256MB")<br/>    postgresql_effective_cache_size         = optional(string, "1GB")<br/>    postgresql_maintenance_work_mem         = optional(string, "64MB")<br/>    postgresql_checkpoint_completion_target = optional(string, "0.9")<br/>    postgresql_wal_buffers                  = optional(string, "16MB")<br/>    postgresql_default_statistics_target    = optional(string, "100")<br/>    postgresql_random_page_cost             = optional(string, "1.1")<br/>    postgresql_effective_io_concurrency     = optional(string, "200")<br/>    postgresql_work_mem                     = optional(string, "2621kB")<br/>    postgresql_min_wal_size                 = optional(string, "512MB")<br/>    postgresql_max_wal_size                 = optional(string, "2GB")<br/>    postgresql_max_slot_wal_keep_size       = optional(string, "10GB") # Cap WAL kept for an inactive replication slot; -1 (unlimited) lets a down replica fill the primary and halt it<br/>    bootstrap_database                      = optional(string, "postgres")<br/>    bootstrap_owner                         = optional(string, "postgres")<br/>    enable_pod_monitor                      = optional(bool, true)<br/>    pod_monitor_labels                      = optional(map(string), {})<br/>    switchover_delay                        = optional(number) # spec.switchoverDelay: seconds the old primary gets to shut down on a switchover/failover; null = CNPG default (3600)<br/>    image_name                              = optional(string) # spec.imageName: PostgreSQL operand image, e.g. ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie; null = CNPG default, fixed at creation<br/>    resources = optional(object({<br/>      requests = optional(object({<br/>        memory = optional(string, "512Mi")<br/>        cpu    = optional(string, "250m")<br/>      }), {})<br/>      limits = optional(object({<br/>        memory = optional(string)<br/>        cpu    = optional(string)<br/>      }), null)<br/>    }), {})<br/>  })</pre> | `{}` | no |
 | <a name="input_databases"></a> [databases](#input\_databases) | List of databases to create. Each object must have name, owner, password, and database\_reclaim\_policy.<br/>If the list is empty, the cluster will be created with no managed database users.<br/>Users can manually add roles to the cluster or add databases through this module later. | <pre>list(object({<br/>    name                        = string<br/>    owner                       = string<br/>    password                    = string<br/>    database_reclaim_policy     = optional(string, "retain")<br/>    pg_database_name            = optional(string, "")<br/>    create_connection_secret    = optional(bool, true)<br/>    connection_secret_namespace = optional(string, "")<br/>  }))</pre> | `[]` | no |
 | <a name="input_labels"></a> [labels](#input\_labels) | Additional labels to add to all resources | `map(string)` | `{}` | no |
+| <a name="input_recovery"></a> [recovery](#input\_recovery) | Bootstrap the cluster from an existing Barman object store instead of initdb - a DRP restore<br/>or a clone of another cluster. When enabled, spec.bootstrap.recovery plus spec.externalClusters<br/>replace spec.bootstrap.initdb, and var.cluster.bootstrap\_database/bootstrap\_owner are ignored.<br/><br/>Recovery only happens once, when the cluster is first created: changing these values afterwards<br/>does not re-run it, the cluster has to be destroyed and created again.<br/><br/>Leave every target\_* and backup\_id unset to recover to the end of the WAL archive.<br/><br/>The restored cluster keeps the roles, passwords and databases of the source. Combine it with<br/>databases = [] so the module does not create Database objects or reset owner passwords on<br/>restored data. | <pre>object({<br/>    enabled = optional(bool, false)<br/><br/>    # serverName of the source cluster inside the object store - the folder the source<br/>    # archived into, which is the source cluster's own name unless it was overridden.<br/>    source_server_name = optional(string, "")<br/><br/>    # Source object store. The credentials only need read access.<br/>    s3_bucket_name       = optional(string, "")<br/>    s3_endpoint_url      = optional(string, "")<br/>    s3_access_key_id     = optional(string, "")<br/>    s3_secret_access_key = optional(string, "")<br/>    # Use an existing secret (keys ACCESS_KEY_ID / ACCESS_SECRET_KEY) instead of the<br/>    # access keys above, e.g. the backup credentials secret of the source cluster.<br/>    credentials_secret = optional(string, "")<br/><br/>    wal_max_parallel = optional(number, 2)<br/><br/>    # spec.bootstrap.recovery.recoveryTarget - at most one of these<br/>    target_time      = optional(string) # e.g. "2026-11-13 09:30:00+00"<br/>    target_lsn       = optional(string)<br/>    target_name      = optional(string)<br/>    target_xid       = optional(string)<br/>    target_immediate = optional(bool)<br/>    target_exclusive = optional(bool) # whether the target itself is included<br/>    backup_id        = optional(string)<br/>  })</pre> | `{}` | no |
 
 ## Outputs
 
@@ -231,6 +235,9 @@ No modules.
 | <a name="output_database_names"></a> [database\_names](#output\_database\_names) | Names of the created databases in PostgreSQL |
 | <a name="output_owner_usernames"></a> [owner\_usernames](#output\_owner\_usernames) | Usernames of the database owners |
 | <a name="output_password_secret_names"></a> [password\_secret\_names](#output\_password\_secret\_names) | Names of the Kubernetes secrets containing the database passwords |
+| <a name="output_recovery_credentials_secret_name"></a> [recovery\_credentials\_secret\_name](#output\_recovery\_credentials\_secret\_name) | Name of the Kubernetes secret holding the credentials for the source object store (null unless recovery is enabled) |
+| <a name="output_recovery_enabled"></a> [recovery\_enabled](#output\_recovery\_enabled) | Whether the cluster was bootstrapped from an object store instead of initdb |
+| <a name="output_recovery_source_server_name"></a> [recovery\_source\_server\_name](#output\_recovery\_source\_server\_name) | serverName in the object store the cluster was recovered from (null unless recovery is enabled) |
 | <a name="output_scheduled_backup_name"></a> [scheduled\_backup\_name](#output\_scheduled\_backup\_name) | Name of the ScheduledBackup resource |
 <!-- END_TF_DOCS -->
 
@@ -328,9 +335,82 @@ kubectl describe backup <backup-name> -n <namespace>
 kubectl describe cluster <cluster-name> -n <namespace>
 ```
 
-### Point-in-Time Recovery (PITR)
+### Restore and Point-in-Time Recovery (PITR)
 
-To restore from backups, create a new cluster with recovery configuration. See the [CloudNativePG documentation](https://cloudnative-pg.io/documentation/current/recovery/) for details.
+`recovery` bootstraps a **new** cluster from an object store instead of `initdb`: the module
+writes `spec.bootstrap.recovery` plus the matching `spec.externalClusters` entry and CloudNativePG
+fetches the base backup and replays WAL. Use it to rehearse a restore (DRP), to clone a cluster, or
+to actually recover one.
+
+Recovery is a one-time bootstrap. CloudNativePG reads it while the cluster is created and never
+again - changing `recovery` afterwards does nothing, the cluster has to be destroyed and recreated.
+
+```hcl
+module "restore" {
+  source = "github.com/pascalinthecloud/terraform-module-cnpg-database?ref=v0.2.0"
+
+  # No Database objects and no managed roles: the restored data already carries
+  # the source cluster's databases, owners and passwords.
+  databases = []
+
+  cluster = {
+    name          = "postgres-cluster-prod-restore" # must differ from the source
+    namespace     = "cnpg-system"
+    instances     = 1
+    storage_class = "csi-cinder-classic-luks"
+    storage_size  = "20Gi"
+    # Same PostgreSQL major as the source; a restore cannot cross major versions.
+    image_name = "ghcr.io/cloudnative-pg/postgresql:18.6-system-trixie"
+  }
+
+  recovery = {
+    enabled            = true
+    source_server_name = "postgres-cluster-prod" # the folder in the bucket
+    s3_bucket_name     = "my-backup-bucket"
+    s3_endpoint_url    = "https://s3.example.net/"
+    # Either an existing secret with ACCESS_KEY_ID / ACCESS_SECRET_KEY ...
+    credentials_secret = "postgres-cluster-prod-backup-credentials"
+    # ... or s3_access_key_id + s3_secret_access_key, which the module puts into
+    # a "<cluster name>-recovery-credentials" secret of its own.
+  }
+
+  # backup is left disabled on purpose: see the warning below.
+}
+```
+
+Point in time instead of "end of the WAL archive":
+
+```hcl
+recovery = {
+  enabled            = true
+  source_server_name = "postgres-cluster-prod"
+  s3_bucket_name     = "my-backup-bucket"
+  credentials_secret = "postgres-cluster-prod-backup-credentials"
+  target_time        = "2026-11-13 09:30:00+00"
+}
+```
+
+At most one target may be set - `target_time`, `target_lsn`, `target_name`, `target_xid` or
+`target_immediate` (stop as soon as the base backup is consistent). `backup_id` picks the base
+backup to start from and may be combined with a target. With none of them set, recovery replays to
+the end of the WAL archive. `target_exclusive = false` includes the target itself.
+
+> ⚠️ **Never let a restored cluster archive into the folder it recovered from.** With `backup`
+> enabled the cluster archives under `serverName = cluster.name`, so a restored cluster must carry a
+> different name than `recovery.source_server_name` - otherwise it overwrites the source's own
+> backup catalog. The module refuses that combination, but only when both point at the same bucket;
+> the safe default for a restore drill is to leave `backup.enabled = false`.
+
+Things worth knowing:
+
+- **Same major version.** The operand image must be the same PostgreSQL major as the source.
+- **Credentials.** Read access to the object store is enough.
+- **Watch it come up:** `kubectl get cluster <name> -n <ns> -w`, and the `<name>-full-recovery` job
+  holds the restore log. `kubectl describe cluster` shows the recovery target it used.
+- **Clean up a drill cluster** by removing the module block and applying - the PVCs go with it.
+
+See the [CloudNativePG recovery documentation](https://cloudnative-pg.io/documentation/current/recovery/)
+for the full picture.
 
 ## Connection Details Secret
 
