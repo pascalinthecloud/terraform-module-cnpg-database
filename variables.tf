@@ -219,8 +219,9 @@ variable "recovery" {
     target_lsn       = optional(string)
     target_name      = optional(string)
     target_xid       = optional(string)
-    target_immediate = optional(bool)
-    target_exclusive = optional(bool) # whether the target itself is included
+    target_tli       = optional(string) # target timeline: "latest" or a positive integer
+    target_immediate = optional(bool)   # stop as soon as a consistent state is reached
+    target_exclusive = optional(bool)   # CRD field "exclusive"; false (the CNPG default) is meaningful
     backup_id        = optional(string)
   })
   default   = {}
@@ -243,16 +244,16 @@ variable "recovery" {
     error_message = "When recovery is enabled, set either credentials_secret or both s3_access_key_id and s3_secret_access_key."
   }
 
+  # target_immediate is only a target when it is true: an explicit false means
+  # "do not stop early" and must not collide with target_time and friends.
   validation {
-    condition = length([
-      for v in [
-        var.recovery.target_time,
-        var.recovery.target_lsn,
-        var.recovery.target_name,
-        var.recovery.target_xid,
-        var.recovery.target_immediate,
-      ] : v if v != null
-    ]) <= 1
+    condition = length(compact([
+      var.recovery.target_time,
+      var.recovery.target_lsn,
+      var.recovery.target_name,
+      var.recovery.target_xid,
+      var.recovery.target_immediate == true ? "targetImmediate" : null,
+    ])) <= 1
     error_message = "Set at most one recovery target (target_time, target_lsn, target_name, target_xid, target_immediate). Leave all unset to recover to the end of the WAL archive."
   }
 

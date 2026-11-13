@@ -37,15 +37,20 @@ locals {
 
   # spec.bootstrap.recovery.recoveryTarget: only the keys that were set. An explicit
   # null would be sent to the API server and rejected by the CRD.
-  recovery_target = {
-    for k, v in {
-      backupID        = var.recovery.backup_id
-      targetTime      = var.recovery.target_time
-      targetLSN       = var.recovery.target_lsn
-      targetName      = var.recovery.target_name
-      targetXID       = var.recovery.target_xid
-      targetImmediate = var.recovery.target_immediate
-      exclusive       = var.recovery.target_exclusive
-    } : k => v if v != null
-  }
+  #
+  # The CRD field is "exclusive", not "targetExclusive", and false is a meaningful
+  # value there (it is also the CNPG default), so it is passed through whenever it
+  # was set. targetImmediate on the other hand is a target: false means "no such
+  # target", so it is left out entirely - otherwise it would also count against the
+  # "at most one target" rule.
+  recovery_target = merge(
+    var.recovery.backup_id != null ? { backupID = var.recovery.backup_id } : {},
+    var.recovery.target_time != null ? { targetTime = var.recovery.target_time } : {},
+    var.recovery.target_lsn != null ? { targetLSN = var.recovery.target_lsn } : {},
+    var.recovery.target_name != null ? { targetName = var.recovery.target_name } : {},
+    var.recovery.target_xid != null ? { targetXID = var.recovery.target_xid } : {},
+    var.recovery.target_tli != null ? { targetTLI = var.recovery.target_tli } : {},
+    var.recovery.target_immediate == true ? { targetImmediate = true } : {},
+    var.recovery.target_exclusive != null ? { exclusive = var.recovery.target_exclusive } : {},
+  )
 }
